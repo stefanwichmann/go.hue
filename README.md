@@ -1,9 +1,11 @@
 go.hue
 ======
 
-[![GoDoc](http://godoc.org/github.com/savaki/go.hue?status.png)](http://godoc.org/github.com/savaki/go.hue)
+[![GoDoc](http://godoc.org/github.com/stefanwichmann/go.hue?status.png)](http://godoc.org/github.com/stefanwichmann/go.hue)
+[![Build Status](https://travis-ci.org/stefanwichmann/go.hue.svg?branch=master)](https://travis-ci.org/stefanwichmann/go.hue)
+[![Go Report Card](https://goreportcard.com/badge/github.com/stefanwichmann/go.hue)](https://goreportcard.com/report/github.com/stefanwichmann/go.hue)
 
-An easy to use api to manage your phillips hue.  For documentation, check out the link to godoc above.
+An easy to use api to manage your Philips Hue.  For documentation, check out the link to godoc above.
 
 ### Example - Register a New Device
 
@@ -84,4 +86,3 @@ func main() {
 }
 
 ```
-
