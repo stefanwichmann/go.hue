@@ -9,5 +9,8 @@ go:
   - tip
   - master
 
+before_script:
+  - go vet ./...
+
 script:
   - go build
