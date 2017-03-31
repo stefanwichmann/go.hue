@@ -120,6 +120,9 @@ func DiscoverBridges(findAllBridges bool) ([]BridgeLocator, error) {
 				}
 				defer response.Body.Close()
 				body, err := ioutil.ReadAll(response.Body)
+				if err != nil {
+					continue
+				}
 
 				// Make sure we really found a hue
 				if !strings.Contains(string(body), "Philips hue") {
