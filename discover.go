@@ -29,8 +29,8 @@ type BridgeLocator interface {
 }
 
 type localBridge struct {
-	Serial  string `json:"id"`
-	IpAddr  string `json:"internalipaddress"`
+	Serial string `json:"id"`
+	IpAddr string `json:"internalipaddress"`
 }
 
 func (self localBridge) CreateUser(deviceType string) (*Bridge, error) {
@@ -78,10 +78,10 @@ func DiscoverBridges(findAllBridges bool) ([]BridgeLocator, error) {
 	if err == nil {
 		conn.SetDeadline(time.Now().Add(3 * time.Second))
 		b := "M-SEARCH * HTTP/1.1\r\n" +
-				"HOST: 239.255.255.250:1900\r\n" +
-				"MAN: \"ssdp:discover\"\r\n" +
-				"MX: 3\r\n" +
-				"ST: go.hue:idl\r\n"
+			"HOST: 239.255.255.250:1900\r\n" +
+			"MAN: \"ssdp:discover\"\r\n" +
+			"MX: 3\r\n" +
+			"ST: go.hue:idl\r\n"
 
 		_, err := conn.WriteToUDP([]byte(b), &net.UDPAddr{IP: net.IPv4(239, 255, 255, 250), Port: 1900})
 		if err == nil {
