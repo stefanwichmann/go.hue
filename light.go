@@ -17,7 +17,7 @@ type LightState struct {
 	Hue       int       `json:"hue"`
 	On        bool      `json:"on"`
 	Effect    string    `json:"effect"`
-	Alert     string    `json:"effect"`
+	Alert     string    `json:"alert"`
 	Bri       int       `json:"bri"`
 	Sat       int       `json:"sat"`
 	Ct        int       `json:"ct"`
