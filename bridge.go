@@ -63,7 +63,7 @@ func (self *Bridge) put(path string, body io.Reader) (*http.Response, error) {
 
 // GetNewLights - retrieves the list lights we've seen since
 // the last scan.  returns the new lights, lastseen, and any error
-// that may have occured as per:
+// that may have occurred as per:
 // http://developers.meethue.com/1_lightsapi.html#12_get_new_lights
 func (self *Bridge) GetNewLights() ([]*Light, string, error) {
 	response, err := self.get("/lights/new")
