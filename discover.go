@@ -157,11 +157,17 @@ func DiscoverBridges(findAllBridges bool) ([]BridgeLocator, error) {
 		}
 	}
 
+	// if we still couldn't find any bridges return the last error
+	if len(bridges) == 0 {
+		return nil, err
+	}
+
 	// convert local bridges to access points
 	var points []BridgeLocator
 	for _, bridge := range bridges {
 		points = append(points, BridgeLocator(bridge))
 	}
 
-	return points, err
+	// We found at least one bridge. Don't return an error to stick to golang conventions.
+	return points, nil
 }
