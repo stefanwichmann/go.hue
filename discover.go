@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/stefanwichmann/lanscan"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -28,7 +27,7 @@ func DiscoverBridges(discoverAllBridges bool) ([]Bridge, error) {
 
 	// Start UPnP and N-UPnP discovery in parallel
 	go upnpDiscover(hostChannel)
-	//go nupnpDiscover(hostChannel)
+	go nupnpDiscover(hostChannel)
 	go validateBridges(hostChannel, bridgeChannel)
 
 	var bridges = []Bridge{}
@@ -43,14 +42,11 @@ loop:
 			if !more {
 				break loop
 			}
-			log.Printf("Discovery: Found bridge: %v\n", bridge)
 			bridges = append(bridges, Bridge{bridge, "", false})
 			if !discoverAllBridges {
-				log.Printf("Discovery: Early return.\n")
 				return bridges, nil
 			}
 		case <-time.After(discoveryTimeout):
-			log.Printf("Discovery: timeout\n")
 			if len(bridges) > 0 {
 				return bridges, nil
 			}
@@ -62,7 +58,6 @@ loop:
 				scanStarted = true
 				continue // Loop again with same timeout
 			}
-			log.Printf("Discovery: Final timeout\n")
 			break loop
 		}
 	}
@@ -72,10 +67,8 @@ loop:
 }
 
 func scanLocalNetwork(hostChannel chan<- string) {
-	log.Printf("Discovery: Starting LAN scan...\n")
 	hosts, err := lanscan.ScanLinkLocal("tcp4", 80, 20, discoveryTimeout-1*time.Second)
 	if err == nil {
-		log.Printf("Discovery: LAN Scan found %v hosts: %v\n", len(hosts), hosts)
 		for _, host := range hosts {
 			hostChannel <- host
 		}
@@ -85,41 +78,30 @@ func scanLocalNetwork(hostChannel chan<- string) {
 
 func validateBridges(candidates <-chan string, bridges chan<- string) {
 	for candidate := range candidates {
-		log.Printf("Validation: Validating %v...\n", candidate)
 		resp, err := http.Get(fmt.Sprintf("http://%s/description.xml", candidate))
 		if err != nil {
-			log.Printf("Validation: %v not valid: %v\n", candidate, err)
 			continue
 		}
 		defer resp.Body.Close()
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Printf("Validation: %v not valid: %v\n", candidate, err)
 			continue
 		}
 
 		// make sure it's a hue bridge
 		str := string(body)
-		//log.Printf("Validation: Validating body %v\n", str)
 		if !strings.Contains(str, "<deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>") {
-			//return errors.New("Invalid description found")
-			log.Printf("Validation: %v not valid.\n", candidate)
 			continue
 		}
 		if !strings.Contains(str, "<manufacturer>Royal Philips Electronics</manufacturer>") {
-			//return errors.New("Invalid description found")
-			log.Printf("Validation: %v not valid.\n", candidate)
 			continue
 		}
 		if !strings.Contains(str, "<modelURL>http://www.meethue.com</modelURL>") {
-			//return errors.New("Invalid description found")
-			log.Printf("Validation: %v not valid.\n", candidate)
 			continue
 		}
 
 		// Candidate seems to be a valid hue bridge
 		bridges <- candidate
 	}
-	log.Printf("Validation: Ended\n")
 	close(bridges)
 }
