@@ -1,6 +1,7 @@
 package hue
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,33 @@ type Bridge struct {
 	IpAddr   string
 	Username string
 	debug    bool
+}
+
+func (self *Bridge) CreateUser(deviceType string) error {
+	// construct our json params
+	params := map[string]string{"devicetype": deviceType}
+	data, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+
+	// create a new user
+	uri := fmt.Sprintf("http://%s/api", self.IpAddr)
+	response, err := client.Post(uri, "text/json", bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	// extract username from the results
+	var results []map[string]map[string]string
+	json.NewDecoder(response.Body).Decode(&results)
+	value := results[0]
+	username := value["success"]["username"]
+
+	// and create the new bridge object
+	self.Username = username
+	return nil
 }
 
 // NewBridge instantiates a bridge object.  Use this method when you already

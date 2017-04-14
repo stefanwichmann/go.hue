@@ -1,176 +1,125 @@
 package hue
 
 import (
-	"bytes"
-	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/stefanwichmann/lanscan"
 	"io/ioutil"
-	"net"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 )
 
-// BridgeLocator represents a factory method you can use to obtain a
-// bridge reference.  Depending on whether this is your first time
-// connecting to a bridge and you need a new username or you're reconnecting
-// to an existing bridge, you call #CreateUser and #Attach respectively
-type BridgeLocator interface {
-	// If this is your first time connnecting to a bridge,
-	// you'll want to call CreateUser(deviceType) where deviceType is any
-	// arbitrary string you can use to name your device.  This will ask
-	// the hub to create a new user with a random username.  The bridge
-	// returned back to you will be populated with the username
-	CreateUser(deviceType string) (*Bridge, error)
-
-	// Attach should be used when you already know the username and want
-	// to obtain a reference to the bridge
-	Attach(username string) *Bridge
-}
-
-type localBridge struct {
-	Serial string `json:"id"`
-	IpAddr string `json:"internalipaddress"`
-}
-
-func (self localBridge) CreateUser(deviceType string) (*Bridge, error) {
-	// construct our json params
-	params := map[string]string{"devicetype": deviceType}
-	data, err := json.Marshal(params)
-	if err != nil {
-		return nil, err
-	}
-
-	// create a new user
-	uri := fmt.Sprintf("http://%s/api", self.IpAddr)
-	response, err := client.Post(uri, "text/json", bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	// extract username from the results
-	var results []map[string]map[string]string
-	json.NewDecoder(response.Body).Decode(&results)
-	value := results[0]
-	username := value["success"]["username"]
-
-	// and create the new bridge object
-	return &Bridge{IpAddr: self.IpAddr, Username: username}, nil
-}
-
-func (self localBridge) Attach(username string) *Bridge {
-	return &Bridge{IpAddr: self.IpAddr, Username: username}
-}
+const discoveryTimeout = 3 * time.Second
 
 // DiscoverBridges is a two-step approach trying to find your hue bridges.
-// First it will try to discover bridges in your network using UPnP. Should
-// this fail it will utilize the hue api (https://www.meethue.com/api/nupnp) to
-// fetch a list of known bridges at the current location. This fallback method
-// assumes that you've already set up the hue and can access it via your mobile
-// device. If findAllBridges is true the UPnP discovery will wait for all
+// First it will try to discover bridges in your network using UPnP and it
+// will utilize the hue api (https://www.meethue.com/api/nupnp) to
+// fetch a list of known bridges at the current location in parallel.
+// Should this fail it will automatically scan all hosts in your local
+// network and identify any bridges you have running.
+// If the parameter discoverAllBridges is true the discovery will wait for all
 // bridges to respond. When set to false, this method will return as soon as it
 // found the first bridge in your network.
-func DiscoverBridges(findAllBridges bool) ([]BridgeLocator, error) {
-	var bridges []localBridge
+func DiscoverBridges(discoverAllBridges bool) ([]Bridge, error) {
+	hostChannel := make(chan string, 10)
+	bridgeChannel := make(chan string, 10)
 
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: 1900})
-	if err == nil {
-		conn.SetDeadline(time.Now().Add(3 * time.Second))
-		b := "M-SEARCH * HTTP/1.1\r\n" +
-			"HOST: 239.255.255.250:1900\r\n" +
-			"MAN: \"ssdp:discover\"\r\n" +
-			"MX: 3\r\n" +
-			"ST: go.hue:idl\r\n"
+	// Start UPnP and N-UPnP discovery in parallel
+	go upnpDiscover(hostChannel)
+	//go nupnpDiscover(hostChannel)
+	go validateBridges(hostChannel, bridgeChannel)
 
-		_, err := conn.WriteToUDP([]byte(b), &net.UDPAddr{IP: net.IPv4(239, 255, 255, 250), Port: 1900})
-		if err == nil {
-			var buf []byte = make([]byte, 8192)
-			for {
-				_, addr, err := conn.ReadFromUDP(buf)
-				if err != nil {
-					break
-				}
-
-				// Since the hue responds 6 times via UDP, we need to filter out dupes
-				dupe := false
-				for _, v := range bridges {
-					if v.IpAddr == addr.IP.String() {
-						dupe = true
-					}
-				}
-				if dupe {
-					continue
-				}
-
-				// Response sanity check
-				if !strings.Contains(string(buf), "LOCATION: ") {
-					continue
-				}
-				var descUrl string
-				{
-					s := strings.SplitAfter(string(buf), "LOCATION: ")
-					descUrl = strings.Split(s[1], "\n")[0]
-				}
-
-				// Fetch description.xml from hue
-				response, err := http.Get(descUrl)
-				if err != nil {
-					continue
-				}
-				defer response.Body.Close()
-				body, err := ioutil.ReadAll(response.Body)
-				if err != nil {
-					continue
-				}
-
-				// Make sure we really found a hue
-				if !strings.Contains(string(body), "Philips hue") {
-					continue
-				}
-
-				// Extract serial number, avoid nasty xml unmarshalling
-				var serial string
-				{
-					s := strings.SplitAfter(string(body), "serialNumber>")
-					serial = strings.Split(s[1], "</serialNumber>")[0]
-				}
-				bridges = append(bridges, localBridge{
-					Serial: serial,
-					IpAddr: addr.IP.String(),
-				})
-				if !findAllBridges {
-					break
-				}
+	var bridges = []Bridge{}
+	scanStarted := false
+loop:
+	for {
+		select {
+		case bridge, more := <-bridgeChannel:
+			if !more && len(bridges) > 0 {
+				return bridges, nil
 			}
+			if !more {
+				break loop
+			}
+			log.Printf("Discovery: Found bridge: %v\n", bridge)
+			bridges = append(bridges, Bridge{bridge, "", false})
+			if !discoverAllBridges {
+				log.Printf("Discovery: Early return.\n")
+				return bridges, nil
+			}
+		case <-time.After(discoveryTimeout):
+			log.Printf("Discovery: timeout\n")
+			if len(bridges) > 0 {
+				return bridges, nil
+			}
+			scanStarted = true
+			if !scanStarted {
+				// UPnP and N-UPnP didn't discover any bridges.
+				// Start a LAN scan and feed results to hostChannel.
+				scanLocalNetwork(hostChannel)
+				scanStarted = true
+				continue // Loop again with same timeout
+			}
+			log.Printf("Discovery: Final timeout\n")
+			break loop
 		}
 	}
 
-	if len(bridges) == 0 {
-		// fallback method
-		response, err := http.Get("https://www.meethue.com/api/nupnp")
+	// Nothing found
+	return bridges, errors.New("Bridge discovery failed")
+}
+
+func scanLocalNetwork(hostChannel chan<- string) {
+	log.Printf("Discovery: Starting LAN scan...\n")
+	hosts, err := lanscan.ScanLinkLocal("tcp4", 80, 20, discoveryTimeout-1*time.Second)
+	if err == nil {
+		log.Printf("Discovery: LAN Scan found %v hosts: %v\n", len(hosts), hosts)
+		for _, host := range hosts {
+			hostChannel <- host
+		}
+	}
+	close(hostChannel)
+}
+
+func validateBridges(candidates <-chan string, bridges chan<- string) {
+	for candidate := range candidates {
+		log.Printf("Validation: Validating %v...\n", candidate)
+		resp, err := http.Get(fmt.Sprintf("http://%s/description.xml", candidate))
 		if err != nil {
-			return nil, err
+			log.Printf("Validation: %v not valid: %v\n", candidate, err)
+			continue
 		}
-		defer response.Body.Close()
-
-		err = json.NewDecoder(response.Body).Decode(&bridges)
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, err
+			log.Printf("Validation: %v not valid: %v\n", candidate, err)
+			continue
 		}
-	}
 
-	// if we still couldn't find any bridges return the last error
-	if len(bridges) == 0 {
-		return nil, err
-	}
+		// make sure it's a hue bridge
+		str := string(body)
+		//log.Printf("Validation: Validating body %v\n", str)
+		if !strings.Contains(str, "<deviceType>urn:schemas-upnp-org:device:Basic:1</deviceType>") {
+			//return errors.New("Invalid description found")
+			log.Printf("Validation: %v not valid.\n", candidate)
+			continue
+		}
+		if !strings.Contains(str, "<manufacturer>Royal Philips Electronics</manufacturer>") {
+			//return errors.New("Invalid description found")
+			log.Printf("Validation: %v not valid.\n", candidate)
+			continue
+		}
+		if !strings.Contains(str, "<modelURL>http://www.meethue.com</modelURL>") {
+			//return errors.New("Invalid description found")
+			log.Printf("Validation: %v not valid.\n", candidate)
+			continue
+		}
 
-	// convert local bridges to access points
-	var points []BridgeLocator
-	for _, bridge := range bridges {
-		points = append(points, BridgeLocator(bridge))
+		// Candidate seems to be a valid hue bridge
+		bridges <- candidate
 	}
-
-	// We found at least one bridge. Don't return an error to stick to golang conventions.
-	return points, nil
+	log.Printf("Validation: Ended\n")
+	close(bridges)
 }
