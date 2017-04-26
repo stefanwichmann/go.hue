@@ -18,6 +18,9 @@ type Bridge struct {
 	debug    bool
 }
 
+// CreateUser registers a new user on the bridge. The user will have
+// to authenticate this request by pressing the blue link button
+// on the physical bridge.
 func (self *Bridge) CreateUser(deviceType string) error {
 	// construct our json params
 	params := map[string]string{"devicetype": deviceType}
@@ -45,8 +48,8 @@ func (self *Bridge) CreateUser(deviceType string) error {
 	return nil
 }
 
-// NewBridge instantiates a bridge object.  Use this method when you already
-// know the ip address and username to use.  Saves the trouble of a lookup.
+// NewBridge instantiates a bridge object. Use this method when you already
+// know the ip address and username to use.
 func NewBridge(ipAddr, username string) *Bridge {
 	return &Bridge{IpAddr: ipAddr, Username: username}
 }
@@ -89,8 +92,21 @@ func (self *Bridge) put(path string, body io.Reader) (*http.Response, error) {
 	return client.Do(request)
 }
 
-// GetNewLights - retrieves the list lights we've seen since
-// the last scan.  returns the new lights, lastseen, and any error
+func (self *Bridge) delete(path string) (*http.Response, error) {
+	uri := self.toUri(path)
+	if self.debug {
+		log.Printf("DELETE %s\n", uri)
+	}
+	request, err := http.NewRequest("DELETE", uri, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.Do(request)
+}
+
+// GetNewLights retrieves the list lights we've seen since
+// the last scan. Returns the new lights, lastseen and any error
 // that may have occurred as per:
 // http://developers.meethue.com/1_lightsapi.html#12_get_new_lights
 func (self *Bridge) GetNewLights() ([]*Light, string, error) {
@@ -138,11 +154,11 @@ func (self *Bridge) FindLightById(id string) (*Light, error) {
 		}
 	}
 
-	return nil, errors.New("unable to find light with id, " + id)
+	return nil, errors.New("Unable to find light with id " + id)
 }
 
-// FindLightByName - similar to FindLightById, this is a convenience method
-// for when you already know the name of the light
+// FindLightByName is a convenience method which
+// returns the light with the given name.
 func (self *Bridge) FindLightByName(name string) (*Light, error) {
 	lights, err := self.GetAllLights()
 	if err != nil {
@@ -155,10 +171,10 @@ func (self *Bridge) FindLightByName(name string) (*Light, error) {
 		}
 	}
 
-	return nil, errors.New("unable to find light with name, " + name)
+	return nil, errors.New("Unable to find light with name " + name)
 }
 
-// Search - for new lights as per
+// Search starts a lookup for new devices on your bridge as per
 // http://developers.meethue.com/1_lightsapi.html#13_search_for_new_lights
 func (self *Bridge) Search() ([]Result, error) {
 	response, err := self.post("/lights", nil)
@@ -172,7 +188,7 @@ func (self *Bridge) Search() ([]Result, error) {
 	return results, err
 }
 
-// GetAllLights - retrieves all lights the Hue is aware of
+// GetAllLights retrieves all devices the bridge is aware of
 func (self *Bridge) GetAllLights() ([]*Light, error) {
 	// fetch all the lights
 	response, err := self.get("/lights")
