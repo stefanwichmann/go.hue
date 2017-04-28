@@ -21,7 +21,7 @@ type Bridge struct {
 // CreateUser registers a new user on the bridge. The user will have
 // to authenticate this request by pressing the blue link button
 // on the physical bridge.
-func (self *Bridge) CreateUser(deviceType string) error {
+func (bridge *Bridge) CreateUser(deviceType string) error {
 	// construct our json params
 	params := map[string]string{"devicetype": deviceType}
 	data, err := json.Marshal(params)
@@ -30,7 +30,7 @@ func (self *Bridge) CreateUser(deviceType string) error {
 	}
 
 	// create a new user
-	uri := fmt.Sprintf("http://%s/api", self.IpAddr)
+	uri := fmt.Sprintf("http://%s/api", bridge.IpAddr)
 	response, err := client.Post(uri, "text/json", bytes.NewReader(data))
 	if err != nil {
 		return err
@@ -44,7 +44,7 @@ func (self *Bridge) CreateUser(deviceType string) error {
 	username := value["success"]["username"]
 
 	// and create the new bridge object
-	self.Username = username
+	bridge.Username = username
 	return nil
 }
 
@@ -54,34 +54,35 @@ func NewBridge(ipAddr, username string) *Bridge {
 	return &Bridge{IpAddr: ipAddr, Username: username}
 }
 
-func (self *Bridge) Debug() *Bridge {
-	self.debug = true
-	return self
+// Debug enables the output of debug messages for every bridge request.
+func (bridge *Bridge) Debug() *Bridge {
+	bridge.debug = true
+	return bridge
 }
 
-func (self *Bridge) toUri(path string) string {
-	return fmt.Sprintf("http://%s/api/%s%s", self.IpAddr, self.Username, path)
+func (bridge *Bridge) toUri(path string) string {
+	return fmt.Sprintf("http://%s/api/%s%s", bridge.IpAddr, bridge.Username, path)
 }
 
-func (self *Bridge) get(path string) (*http.Response, error) {
-	uri := self.toUri(path)
-	if self.debug {
+func (bridge *Bridge) get(path string) (*http.Response, error) {
+	uri := bridge.toUri(path)
+	if bridge.debug {
 		log.Printf("GET %s\n", uri)
 	}
 	return client.Get(uri)
 }
 
-func (self *Bridge) post(path string, body io.Reader) (*http.Response, error) {
-	uri := self.toUri(path)
-	if self.debug {
+func (bridge *Bridge) post(path string, body io.Reader) (*http.Response, error) {
+	uri := bridge.toUri(path)
+	if bridge.debug {
 		log.Printf("POST %s\n", uri)
 	}
 	return client.Post(uri, "application/json", body)
 }
 
-func (self *Bridge) put(path string, body io.Reader) (*http.Response, error) {
-	uri := self.toUri(path)
-	if self.debug {
+func (bridge *Bridge) put(path string, body io.Reader) (*http.Response, error) {
+	uri := bridge.toUri(path)
+	if bridge.debug {
 		log.Printf("PUT %s\n", uri)
 	}
 	request, err := http.NewRequest("PUT", uri, body)
@@ -92,9 +93,9 @@ func (self *Bridge) put(path string, body io.Reader) (*http.Response, error) {
 	return client.Do(request)
 }
 
-func (self *Bridge) delete(path string) (*http.Response, error) {
-	uri := self.toUri(path)
-	if self.debug {
+func (bridge *Bridge) delete(path string) (*http.Response, error) {
+	uri := bridge.toUri(path)
+	if bridge.debug {
 		log.Printf("DELETE %s\n", uri)
 	}
 	request, err := http.NewRequest("DELETE", uri, nil)
@@ -109,8 +110,8 @@ func (self *Bridge) delete(path string) (*http.Response, error) {
 // the last scan. Returns the new lights, lastseen and any error
 // that may have occurred as per:
 // http://developers.meethue.com/1_lightsapi.html#12_get_new_lights
-func (self *Bridge) GetNewLights() ([]*Light, string, error) {
-	response, err := self.get("/lights/new")
+func (bridge *Bridge) GetNewLights() ([]*Light, string, error) {
+	response, err := bridge.get("/lights/new")
 	if err != nil {
 		return nil, "", err
 	}
@@ -142,8 +143,8 @@ func (self *Bridge) GetNewLights() ([]*Light, string, error) {
 }
 
 // FindLightById allows you to easily look up light if you know it's Id
-func (self *Bridge) FindLightById(id string) (*Light, error) {
-	lights, err := self.GetAllLights()
+func (bridge *Bridge) FindLightById(id string) (*Light, error) {
+	lights, err := bridge.GetAllLights()
 	if err != nil {
 		return nil, err
 	}
@@ -159,8 +160,8 @@ func (self *Bridge) FindLightById(id string) (*Light, error) {
 
 // FindLightByName is a convenience method which
 // returns the light with the given name.
-func (self *Bridge) FindLightByName(name string) (*Light, error) {
-	lights, err := self.GetAllLights()
+func (bridge *Bridge) FindLightByName(name string) (*Light, error) {
+	lights, err := bridge.GetAllLights()
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +177,8 @@ func (self *Bridge) FindLightByName(name string) (*Light, error) {
 
 // Search starts a lookup for new devices on your bridge as per
 // http://developers.meethue.com/1_lightsapi.html#13_search_for_new_lights
-func (self *Bridge) Search() ([]Result, error) {
-	response, err := self.post("/lights", nil)
+func (bridge *Bridge) Search() ([]Result, error) {
+	response, err := bridge.post("/lights", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,9 +190,9 @@ func (self *Bridge) Search() ([]Result, error) {
 }
 
 // GetAllLights retrieves all devices the bridge is aware of
-func (self *Bridge) GetAllLights() ([]*Light, error) {
+func (bridge *Bridge) GetAllLights() ([]*Light, error) {
 	// fetch all the lights
-	response, err := self.get("/lights")
+	response, err := bridge.get("/lights")
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +208,7 @@ func (self *Bridge) GetAllLights() ([]*Light, error) {
 	// and convert them into lights
 	var lights []*Light
 	for id, params := range results {
-		light := Light{Id: id, Name: params.Name, bridge: self}
+		light := Light{Id: id, Name: params.Name, bridge: bridge}
 		lights = append(lights, &light)
 	}
 

@@ -30,28 +30,28 @@ type LightState struct {
 // SetLightState encapsulates all attributes to set a light to a specific state
 type SetLightState struct {
 	// On/Off state of the light. On=true, Off=false
-	On             string
+	On string
 
 	// The brightness value to set the light to.
 	// Brightness is a scale from 1 (the minimum the light is capable of) to 254 (the maximum).
 	// Note: a brightness of 1 is not off.
-	Bri            string
+	Bri string
 
 	// The hue value to set light to.
 	// The hue value is a wrapping value between 0 and 65535.
 	// Both 0 and 65535 are red, 25500 is green and 46920 is blue.
-	Hue            string
+	Hue string
 
 	// Saturation of the light. 254 is the most saturated (colored) and 0 is the least saturated (white).
-	Sat            string
+	Sat string
 
 	// The x and y coordinates of a color in CIE color space.
 	// The first entry is the x coordinate and the second entry is the y coordinate. Both x and y must be between 0 and 1.
 	// If the specified coordinates are not in the CIE color space, the closest color to the coordinates will be chosen.
-	Xy             []float32
+	Xy []float32
 
 	// The Mired Color temperature of the light. 2012 connected lights are capable of 153 (6500K) to 500 (2000K).
-	Ct             string
+	Ct string
 
 	// The alert effect, is a temporary change to the bulb’s state, and has one of the following values:
 	// “none” – The light is not performing an alert effect.
@@ -60,11 +60,11 @@ type SetLightState struct {
 	//
 	// Note that this contains the last alert sent to the light and not its current state.
 	// i.e. After the breathe cycle has finished the bridge does not reset the alert to "none".
-	Alert          string
+	Alert string
 
 	// The dynamic effect of the light. Currently “none” and “colorloop” are supported. Other values will generate an error of type 7.
 	// Setting the effect to colorloop will cycle through all hues using the current brightness and saturation settings.
-	Effect         string
+	Effect string
 
 	// The duration of the transition from the light’s current state to the new state.
 	// This is given as a multiple of 100ms and defaults to 4 (400ms).
@@ -84,8 +84,8 @@ type LightAttributes struct {
 
 // GetLightAttributes retrieves light attributes and state as per
 // http://developers.meethue.com/1_lightsapi.html#14_get_light_attributes_and_state
-func (self *Light) GetLightAttributes() (*LightAttributes, error) {
-	response, err := self.bridge.get("/lights/" + self.Id)
+func (light *Light) GetLightAttributes() (*LightAttributes, error) {
+	response, err := light.bridge.get("/lights/" + light.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -98,14 +98,14 @@ func (self *Light) GetLightAttributes() (*LightAttributes, error) {
 
 // SetName sets the name of a light as per
 // http://developers.meethue.com/1_lightsapi.html#15_set_light_attributes_rename
-func (self *Light) SetName(newName string) ([]Result, error) {
+func (light *Light) SetName(newName string) ([]Result, error) {
 	params := map[string]string{"name": newName}
 	data, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := self.bridge.put("/lights/"+self.Id, bytes.NewReader(data))
+	response, err := light.bridge.put("/lights/"+light.Id, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -117,33 +117,33 @@ func (self *Light) SetName(newName string) ([]Result, error) {
 }
 
 // On is a convenience method to turn on a light and set its effect to "none"
-func (self *Light) On() ([]Result, error) {
+func (light *Light) On() ([]Result, error) {
 	state := SetLightState{
 		On:     "true",
 		Effect: "none",
 	}
-	return self.SetState(state)
+	return light.SetState(state)
 }
 
 // Off is a convenience method to turn off a light
-func (self *Light) Off() ([]Result, error) {
+func (light *Light) Off() ([]Result, error) {
 	state := SetLightState{On: "false"}
-	return self.SetState(state)
+	return light.SetState(state)
 }
 
 // ColorLoop is a convenience method to turn on a light and have it begin
 // a colorloop effect
-func (self *Light) ColorLoop() ([]Result, error) {
+func (light *Light) ColorLoop() ([]Result, error) {
 	state := SetLightState{
 		On:     "true",
 		Effect: "colorloop",
 	}
-	return self.SetState(state)
+	return light.SetState(state)
 }
 
 // SetState sets the state of a light as per
 // http://developers.meethue.com/1_lightsapi.html#16_set_light_state
-func (self *Light) SetState(state SetLightState) ([]Result, error) {
+func (light *Light) SetState(state SetLightState) ([]Result, error) {
 	params := make(map[string]interface{})
 
 	if state.On != "" {
@@ -180,7 +180,7 @@ func (self *Light) SetState(state SetLightState) ([]Result, error) {
 		return nil, err
 	}
 
-	response, err := self.bridge.put("/lights/"+self.Id+"/state", bytes.NewReader(data))
+	response, err := light.bridge.put("/lights/"+light.Id+"/state", bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
