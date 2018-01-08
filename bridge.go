@@ -112,10 +112,12 @@ func (bridge *Bridge) delete(path string) (*http.Response, error) {
 // http://developers.meethue.com/1_lightsapi.html#12_get_new_lights
 func (bridge *Bridge) GetNewLights() ([]*Light, string, error) {
 	response, err := bridge.get("/lights/new")
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		return nil, "", err
 	}
-	defer response.Body.Close()
 
 	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
@@ -179,10 +181,12 @@ func (bridge *Bridge) FindLightByName(name string) (*Light, error) {
 // http://developers.meethue.com/1_lightsapi.html#13_search_for_new_lights
 func (bridge *Bridge) Search() ([]Result, error) {
 	response, err := bridge.post("/lights", nil)
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	var results []Result
 	err = json.NewDecoder(response.Body).Decode(&results)
@@ -193,10 +197,12 @@ func (bridge *Bridge) Search() ([]Result, error) {
 func (bridge *Bridge) GetAllLights() ([]*Light, error) {
 	// fetch all the lights
 	response, err := bridge.get("/lights")
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	// deconstruct the json results
 	var results map[string]Light

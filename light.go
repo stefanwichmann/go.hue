@@ -86,10 +86,12 @@ type LightAttributes struct {
 // http://developers.meethue.com/1_lightsapi.html#14_get_light_attributes_and_state
 func (light *Light) GetLightAttributes() (*LightAttributes, error) {
 	response, err := light.bridge.get("/lights/" + light.Id)
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	result := new(LightAttributes)
 	err = json.NewDecoder(response.Body).Decode(&result)
@@ -106,10 +108,12 @@ func (light *Light) SetName(newName string) ([]Result, error) {
 	}
 
 	response, err := light.bridge.put("/lights/"+light.Id, bytes.NewReader(data))
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	var results []Result
 	err = json.NewDecoder(response.Body).Decode(&results)
@@ -181,10 +185,12 @@ func (light *Light) SetState(state SetLightState) ([]Result, error) {
 	}
 
 	response, err := light.bridge.put("/lights/"+light.Id+"/state", bytes.NewReader(data))
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	var results []Result
 	err = json.NewDecoder(response.Body).Decode(&results)
