@@ -16,6 +16,8 @@ type Bridge struct {
 	IpAddr   string
 	Username string
 	debug    bool
+	useHTTPS bool
+	client   *http.Client
 }
 
 // CreateUser registers a new user on the bridge. The user will have
@@ -30,8 +32,7 @@ func (bridge *Bridge) CreateUser(deviceType string) error {
 	}
 
 	// create a new user
-	uri := fmt.Sprintf("http://%s/api", bridge.IpAddr)
-	response, err := client.Post(uri, "text/json", bytes.NewReader(data))
+	response, err := bridge.client.Post(bridge.baseUrl(), "text/json", bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func (bridge *Bridge) CreateUser(deviceType string) error {
 // NewBridge instantiates a bridge object. Use this method when you already
 // know the ip address and username to use.
 func NewBridge(ipAddr, username string) *Bridge {
-	return &Bridge{IpAddr: ipAddr, Username: username}
+	return &Bridge{IpAddr: ipAddr, Username: username, debug: false, useHTTPS: false, client: newTimeoutClient()}
 }
 
 // Debug enables the output of debug messages for every bridge request.
@@ -60,8 +61,21 @@ func (bridge *Bridge) Debug() *Bridge {
 	return bridge
 }
 
+// UseHTTPS enables the use of an encrypted communication (requires bridge software version 1.24 or later)
+func (bridge *Bridge) UseHTTPS() *Bridge {
+	bridge.useHTTPS = true
+	return bridge
+}
+
+func (bridge *Bridge) baseUrl() string {
+	if bridge.useHTTPS {
+		return fmt.Sprintf("https://%s/api", bridge.IpAddr)
+	}
+	return fmt.Sprintf("http://%s/api", bridge.IpAddr)
+}
+
 func (bridge *Bridge) toUri(path string) string {
-	return fmt.Sprintf("http://%s/api/%s%s", bridge.IpAddr, bridge.Username, path)
+	return fmt.Sprintf("%s/%s%s", bridge.baseUrl(), bridge.Username, path)
 }
 
 func (bridge *Bridge) get(path string) (*http.Response, error) {
@@ -69,7 +83,7 @@ func (bridge *Bridge) get(path string) (*http.Response, error) {
 	if bridge.debug {
 		log.Printf("GET %s\n", uri)
 	}
-	return client.Get(uri)
+	return bridge.client.Get(uri)
 }
 
 func (bridge *Bridge) post(path string, body io.Reader) (*http.Response, error) {
@@ -77,7 +91,7 @@ func (bridge *Bridge) post(path string, body io.Reader) (*http.Response, error) 
 	if bridge.debug {
 		log.Printf("POST %s\n", uri)
 	}
-	return client.Post(uri, "application/json", body)
+	return bridge.client.Post(uri, "application/json", body)
 }
 
 func (bridge *Bridge) put(path string, body io.Reader) (*http.Response, error) {
@@ -90,7 +104,7 @@ func (bridge *Bridge) put(path string, body io.Reader) (*http.Response, error) {
 		return nil, err
 	}
 
-	return client.Do(request)
+	return bridge.client.Do(request)
 }
 
 func (bridge *Bridge) delete(path string) (*http.Response, error) {
@@ -103,7 +117,7 @@ func (bridge *Bridge) delete(path string) (*http.Response, error) {
 		return nil, err
 	}
 
-	return client.Do(request)
+	return bridge.client.Do(request)
 }
 
 // GetNewLights retrieves the list lights we've seen since
