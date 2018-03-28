@@ -5,6 +5,13 @@
 
 For documentation, check out the link to godoc above.
 
+# Features added to this fork so far
+- Added configuration API
+- Added scenes API
+- Added third bridge discovery method (LAN scanning)
+- Fixed documentation issues
+- Fixed ```go vet``` and ```go lint``` issues
+
 # Examples
 ### Register a new device
 To start using the hue API, you first need to register your device.
