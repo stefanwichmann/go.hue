@@ -38,6 +38,7 @@ type ModifyScene struct {
 	StoreLightState bool     `json:"storelightstate,omitempty"`
 }
 
+// ModifyLightState contains all light attributes to be changed on a given scene.
 type ModifyLightState struct {
 	On               bool      `json:"on,omitempty"`
 	Brightness       uint8     `json:"bri,omitempty"`
