@@ -219,16 +219,16 @@ func (bridge *Bridge) GetAllLights() ([]*Light, error) {
 	}
 
 	// deconstruct the json results
-	var results map[string]Light
-	err = json.NewDecoder(response.Body).Decode(&results)
+	var result map[string]LightAttributes
+	err = json.NewDecoder(response.Body).Decode(&result)
 	if err != nil {
 		return nil, err
 	}
 
 	// and convert them into lights
 	var lights []*Light
-	for id, params := range results {
-		light := Light{Id: id, Name: params.Name, bridge: bridge}
+	for id, attributes := range result {
+		light := Light{Id: id, Name: attributes.Name, Attributes: attributes, bridge: bridge}
 		lights = append(lights, &light)
 	}
 

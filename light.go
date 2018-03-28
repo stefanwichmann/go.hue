@@ -8,9 +8,10 @@ import (
 
 // Light encapsulates the controls for a specific philips hue light
 type Light struct {
-	Id     string
-	Name   string
-	bridge *Bridge
+	Id         string
+	Name       string
+	Attributes LightAttributes
+	bridge     *Bridge
 }
 
 // LightState encapsulates all attributes for a specific philips hue light state
@@ -74,12 +75,14 @@ type SetLightState struct {
 
 // LightAttributes encapsulates all attributes (hardware and state) for a specific philips hue light
 type LightAttributes struct {
-	State           LightState        `json:"state"`
-	Type            string            `json:"type"`
-	Name            string            `json:"name"`
-	ModelId         string            `json:"modelid"`
-	SoftwareVersion string            `json:"swversion"`
-	PointSymbol     map[string]string `json:"pointsymbol"`
+	State            LightState `json:"state"`
+	Type             string     `json:"type"`
+	Name             string     `json:"name"`
+	ModelId          string     `json:"modelid"`
+	UniqueId         string     `json:"uniqueid"`
+	ManufacturerName string     `json:"manufacturername"`
+	ProductName      string     `json:"productname"`
+	SoftwareVersion  string     `json:"swversion"`
 }
 
 // GetLightAttributes retrieves light attributes and state as per
@@ -93,9 +96,15 @@ func (light *Light) GetLightAttributes() (*LightAttributes, error) {
 		return nil, err
 	}
 
-	result := new(LightAttributes)
+	var result LightAttributes
 	err = json.NewDecoder(response.Body).Decode(&result)
-	return result, err
+	if err != nil {
+		return &result, err
+	}
+
+	// update locally cached attributes
+	light.Attributes = result
+	return &result, nil
 }
 
 // SetName sets the name of a light as per
