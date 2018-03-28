@@ -42,7 +42,7 @@ loop:
 			if !more {
 				break loop
 			}
-			bridges = append(bridges, Bridge{bridge, "", false})
+			bridges = append(bridges, *NewBridge(bridge, ""))
 			if !discoverAllBridges {
 				return bridges, nil
 			}
