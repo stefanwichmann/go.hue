@@ -5,10 +5,12 @@
 
 For documentation, check out the link to godoc above.
 
-# Features added to this fork so far
+# Features added to this fork
 - Added configuration API
 - Added scenes API
-- Added third bridge discovery method (LAN scanning)
+- Added additional bridge discovery method (LAN scanning)
+- Added HTTPS support (needs bridge API version 1.24)
+- Adapt API changes
 - Fixed documentation issues
 - Fixed ```go vet``` and ```go lint``` issues
 
