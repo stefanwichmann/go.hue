@@ -61,10 +61,9 @@ func (bridge *Bridge) Debug() *Bridge {
 	return bridge
 }
 
-// UseHTTPS enables the use of an encrypted communication (requires bridge software version 1.24 or later)
-func (bridge *Bridge) UseHTTPS() *Bridge {
-	bridge.useHTTPS = true
-	return bridge
+// EnableHTTPS controls the use of an encrypted communication (requires bridge software version 1.24 or later)
+func (bridge *Bridge) EnableHTTPS(enable bool) {
+	bridge.useHTTPS = enable
 }
 
 func (bridge *Bridge) baseUrl() string {
@@ -75,7 +74,10 @@ func (bridge *Bridge) baseUrl() string {
 }
 
 func (bridge *Bridge) toUri(path string) string {
-	return fmt.Sprintf("%s/%s%s", bridge.baseUrl(), bridge.Username, path)
+	if bridge.Username != "" {
+		return fmt.Sprintf("%s/%s%s", bridge.baseUrl(), bridge.Username, path)
+	}
+	return fmt.Sprintf("%s%s", bridge.baseUrl(), path)
 }
 
 func (bridge *Bridge) get(path string) (*http.Response, error) {
