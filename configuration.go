@@ -32,10 +32,12 @@ type Configuration struct {
 // Configuration return all basic information about the hue bridge itself.
 func (bridge *Bridge) Configuration() (*Configuration, error) {
 	response, err := bridge.get("/config")
+	if response != nil {
+		defer response.Body.Close()
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
 	var result Configuration
 	err = json.NewDecoder(response.Body).Decode(&result)
