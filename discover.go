@@ -50,7 +50,6 @@ loop:
 			if len(bridges) > 0 {
 				return bridges, nil
 			}
-			scanStarted = true
 			if !scanStarted {
 				// UPnP and N-UPnP didn't discover any bridges.
 				// Start a LAN scan and feed results to hostChannel.

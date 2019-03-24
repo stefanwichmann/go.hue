@@ -32,7 +32,7 @@ func (bridge *Bridge) CreateUser(deviceType string) error {
 	}
 
 	// create a new user
-	response, err := bridge.client.Post(bridge.baseUrl(), "text/json", bytes.NewReader(data))
+	response, err := bridge.client.Post(bridge.baseURL(), "text/json", bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
@@ -66,22 +66,22 @@ func (bridge *Bridge) EnableHTTPS(enable bool) {
 	bridge.useHTTPS = enable
 }
 
-func (bridge *Bridge) baseUrl() string {
+func (bridge *Bridge) baseURL() string {
 	if bridge.useHTTPS {
 		return fmt.Sprintf("https://%s/api", bridge.IpAddr)
 	}
 	return fmt.Sprintf("http://%s/api", bridge.IpAddr)
 }
 
-func (bridge *Bridge) toUri(path string) string {
+func (bridge *Bridge) toURI(path string) string {
 	if bridge.Username != "" {
-		return fmt.Sprintf("%s/%s%s", bridge.baseUrl(), bridge.Username, path)
+		return fmt.Sprintf("%s/%s%s", bridge.baseURL(), bridge.Username, path)
 	}
-	return fmt.Sprintf("%s%s", bridge.baseUrl(), path)
+	return fmt.Sprintf("%s%s", bridge.baseURL(), path)
 }
 
 func (bridge *Bridge) get(path string) (*http.Response, error) {
-	uri := bridge.toUri(path)
+	uri := bridge.toURI(path)
 	if bridge.debug {
 		log.Printf("GET %s\n", uri)
 	}
@@ -89,7 +89,7 @@ func (bridge *Bridge) get(path string) (*http.Response, error) {
 }
 
 func (bridge *Bridge) post(path string, body io.Reader) (*http.Response, error) {
-	uri := bridge.toUri(path)
+	uri := bridge.toURI(path)
 	if bridge.debug {
 		log.Printf("POST %s\n", uri)
 	}
@@ -97,7 +97,7 @@ func (bridge *Bridge) post(path string, body io.Reader) (*http.Response, error) 
 }
 
 func (bridge *Bridge) put(path string, body io.Reader) (*http.Response, error) {
-	uri := bridge.toUri(path)
+	uri := bridge.toURI(path)
 	if bridge.debug {
 		log.Printf("PUT %s\n", uri)
 	}
@@ -110,7 +110,7 @@ func (bridge *Bridge) put(path string, body io.Reader) (*http.Response, error) {
 }
 
 func (bridge *Bridge) delete(path string) (*http.Response, error) {
-	uri := bridge.toUri(path)
+	uri := bridge.toURI(path)
 	if bridge.debug {
 		log.Printf("DELETE %s\n", uri)
 	}

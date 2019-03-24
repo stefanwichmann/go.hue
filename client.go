@@ -6,24 +6,24 @@ import "net/http"
 import "time"
 
 // Use a global timeout for all client operations
-const clientTimeoutInSeconds = 2 * time.Second
+const clientTimeout = 2 * time.Second
 
 func newTimeoutClient() *http.Client {
 	transport := http.Transport{
 		Dial:                  timeoutDialer,
 		DialTLS:               timeoutDialerTLS,
-		TLSHandshakeTimeout:   clientTimeoutInSeconds,
-		ResponseHeaderTimeout: clientTimeoutInSeconds,
+		TLSHandshakeTimeout:   clientTimeout,
+		ResponseHeaderTimeout: clientTimeout,
 	}
 
 	return &http.Client{
 		Transport: &transport,
-		Timeout:   clientTimeoutInSeconds,
+		Timeout:   clientTimeout,
 	}
 }
 
 func timeoutDialer(network, addr string) (net.Conn, error) {
-	dialer := net.Dialer{Timeout: clientTimeoutInSeconds}
+	dialer := net.Dialer{Timeout: clientTimeout}
 	return dialer.Dial(network, addr)
 }
 

@@ -7,7 +7,7 @@ const nupnpEndpoint = "https://www.meethue.com/api/nupnp"
 
 type nupnpBridge struct {
 	Serial string `json:"id"`
-	IpAddr string `json:"internalipaddress"`
+	IPAddr string `json:"internalipaddress"`
 }
 
 func nupnpDiscover(respondingHosts chan<- string) error {
@@ -24,7 +24,7 @@ func nupnpDiscover(respondingHosts chan<- string) error {
 	}
 
 	for _, bridge := range bridges {
-		respondingHosts <- bridge.IpAddr
+		respondingHosts <- bridge.IPAddr
 	}
 	return nil
 }
