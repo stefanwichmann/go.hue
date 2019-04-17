@@ -1,8 +1,6 @@
 package hue
 
 import (
-	"bytes"
-	"encoding/json"
 	"strconv"
 )
 
@@ -88,18 +86,10 @@ type LightAttributes struct {
 // GetLightAttributes retrieves light attributes and state as per
 // http://developers.meethue.com/1_lightsapi.html#14_get_light_attributes_and_state
 func (light *Light) GetLightAttributes() (*LightAttributes, error) {
-	response, err := light.bridge.get("/lights/" + light.Id)
-	if response != nil {
-		defer response.Body.Close()
-	}
+	var result LightAttributes
+	err := light.bridge.get("/lights/"+light.Id, &result)
 	if err != nil {
 		return nil, err
-	}
-
-	var result LightAttributes
-	err = json.NewDecoder(response.Body).Decode(&result)
-	if err != nil {
-		return &result, err
 	}
 
 	// update locally cached attributes
@@ -111,22 +101,12 @@ func (light *Light) GetLightAttributes() (*LightAttributes, error) {
 // http://developers.meethue.com/1_lightsapi.html#15_set_light_attributes_rename
 func (light *Light) SetName(newName string) ([]Result, error) {
 	params := map[string]string{"name": newName}
-	data, err := json.Marshal(params)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := light.bridge.put("/lights/"+light.Id, bytes.NewReader(data))
-	if response != nil {
-		defer response.Body.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-
 	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
-	return results, err
+	err := light.bridge.put("/lights/"+light.Id, &params, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 // On is a convenience method to turn on a light and set its effect to "none"
@@ -188,20 +168,10 @@ func (light *Light) SetState(state SetLightState) ([]Result, error) {
 		params["transitiontime"], _ = strconv.Atoi(state.TransitionTime)
 	}
 
-	data, err := json.Marshal(params)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := light.bridge.put("/lights/"+light.Id+"/state", bytes.NewReader(data))
-	if response != nil {
-		defer response.Body.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-
 	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
-	return results, err
+	err := light.bridge.put("/lights/"+light.Id+"/state", &params, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }

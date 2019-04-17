@@ -1,7 +1,5 @@
 package hue
 
-import "encoding/json"
-import "bytes"
 import "fmt"
 import "errors"
 
@@ -54,34 +52,20 @@ type ModifyLightState struct {
 // In addition to the given information the current light states of all referenced
 // lights will be part of the scene.
 func (bridge *Bridge) CreateScene(scenedata CreateScene) ([]Result, error) {
-	data, err := json.Marshal(scenedata)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := bridge.post("/scenes/", bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
 	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
-	return results, err
+	err := bridge.post("/scenes/", &scenedata, &results)
+	if err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 // AllScenes returns all scenes currently saved on the bridge.
 func (bridge *Bridge) AllScenes() ([]*Scene, error) {
 	var scenes []*Scene
-	response, err := bridge.get("/scenes")
-	if err != nil {
-		return scenes, err
-	}
-	defer response.Body.Close()
-
-	// deconstruct the json results
 	var results map[string]Scene
-	err = json.NewDecoder(response.Body).Decode(&results)
+	err := bridge.get("/scenes", &results)
 	if err != nil {
 		return scenes, err
 	}
@@ -102,15 +86,8 @@ func (bridge *Bridge) AllScenes() ([]*Scene, error) {
 
 // SceneByID looks up the scene with the given ID on the bridge.
 func (bridge *Bridge) SceneByID(id string) (*Scene, error) {
-	response, err := bridge.get(fmt.Sprintf("/scenes/%s", id))
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	// deconstruct the json results
 	var result Scene
-	err = json.NewDecoder(response.Body).Decode(&result)
+	err := bridge.get(fmt.Sprintf("/scenes/%s", id), &result)
 	if err != nil {
 		return nil, err
 	}
@@ -139,20 +116,12 @@ func (bridge *Bridge) SceneByName(name string) (*Scene, error) {
 
 // Modify adjusts a saved scene according to the given attributes.
 func (scene *Scene) Modify(modifyScene ModifyScene) ([]Result, error) {
-	data, err := json.Marshal(modifyScene)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := scene.bridge.put("/scenes/"+scene.Id, bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
 	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
-	return results, err
+	err := scene.bridge.put("/scenes/"+scene.Id, &modifyScene, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 // ModifyLightStates adjusts the saved light states of all lights in the given scene on the bridge.
@@ -172,51 +141,32 @@ func (scene *Scene) ModifyLightStates(lightstate ModifyLightState) ([]Result, er
 
 // ModifyLightState adjusts the saved light state of the given light in the given scene on the bridge.
 func (scene *Scene) ModifyLightState(lightID string, lightstate ModifyLightState) ([]Result, error) {
-	data, err := json.Marshal(lightstate)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := scene.bridge.put(fmt.Sprintf("/scenes/%s/lightstates/%s", scene.Id, lightID), bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
 	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
-	return results, err
+	err := scene.bridge.put(fmt.Sprintf("/scenes/%s/lightstates/%s", scene.Id, lightID), &lightstate, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }
 
 // Delete will remove the given scene from the bridge.
 func (scene *Scene) Delete() ([]Result, error) {
-	response, err := scene.bridge.delete("/scenes/" + scene.Id)
+	var results []Result
+	err := scene.bridge.delete("/scenes/"+scene.Id, &results)
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
 
-	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
-	fmt.Printf("RES: %v\n", results)
 	return results, err
 }
 
 // Activate will recall the given scene according to it's state on the bridge.
 func (scene *Scene) Activate() ([]Result, error) {
 	request := map[string]string{"scene": scene.Id}
-	data, err := json.Marshal(request)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := scene.bridge.put("/groups/0/action", bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
 	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
-	return results, err
+	err := scene.bridge.put("/groups/0/action", &request, &results)
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
 }

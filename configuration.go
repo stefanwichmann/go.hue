@@ -1,7 +1,5 @@
 package hue
 
-import "encoding/json"
-
 // Configuration contains all basic information about the hue bridge itself.
 type Configuration struct {
 	Name             string                 `json:"name"`
@@ -31,15 +29,10 @@ type Configuration struct {
 
 // Configuration return all basic information about the hue bridge itself.
 func (bridge *Bridge) Configuration() (*Configuration, error) {
-	response, err := bridge.get("/config")
-	if response != nil {
-		defer response.Body.Close()
-	}
+	var result Configuration
+	err := bridge.get("/config", &result)
 	if err != nil {
 		return nil, err
 	}
-
-	var result Configuration
-	err = json.NewDecoder(response.Body).Decode(&result)
-	return &result, err
+	return &result, nil
 }

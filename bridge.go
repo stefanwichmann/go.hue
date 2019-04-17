@@ -24,28 +24,16 @@ type Bridge struct {
 // to authenticate this request by pressing the blue link button
 // on the physical bridge.
 func (bridge *Bridge) CreateUser(deviceType string) error {
-	// construct our json params
 	params := map[string]string{"devicetype": deviceType}
-	data, err := json.Marshal(params)
-	if err != nil {
-		return err
-	}
-
-	// create a new user
-	response, err := bridge.client.Post(bridge.baseURL(), "text/json", bytes.NewReader(data))
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	// extract username from the results
 	var results []map[string]map[string]string
-	json.NewDecoder(response.Body).Decode(&results)
-	value := results[0]
-	username := value["success"]["username"]
 
-	// and create the new bridge object
-	bridge.Username = username
+	err := bridge.do("POST", bridge.baseURL(), &params, &results)
+	if err != nil {
+		return err
+	}
+
+	value := results[0]
+	bridge.Username = value["success"]["username"]
 	return nil
 }
 
@@ -80,46 +68,74 @@ func (bridge *Bridge) toURI(path string) string {
 	return fmt.Sprintf("%s%s", bridge.baseURL(), path)
 }
 
-func (bridge *Bridge) get(path string) (*http.Response, error) {
-	uri := bridge.toURI(path)
-	if bridge.debug {
-		log.Printf("GET %s\n", uri)
-	}
-	return bridge.client.Get(uri)
+func (bridge *Bridge) get(path string, result interface{}) error {
+	return bridge.do("GET", bridge.toURI(path), nil, result)
 }
 
-func (bridge *Bridge) post(path string, body io.Reader) (*http.Response, error) {
-	uri := bridge.toURI(path)
-	if bridge.debug {
-		log.Printf("POST %s\n", uri)
-	}
-	return bridge.client.Post(uri, "application/json", body)
+func (bridge *Bridge) post(path string, request interface{}, result interface{}) error {
+	return bridge.do("POST", bridge.toURI(path), request, result)
 }
 
-func (bridge *Bridge) put(path string, body io.Reader) (*http.Response, error) {
-	uri := bridge.toURI(path)
-	if bridge.debug {
-		log.Printf("PUT %s\n", uri)
+func (bridge *Bridge) put(path string, request interface{}, result interface{}) error {
+	return bridge.do("PUT", bridge.toURI(path), request, result)
+}
+
+func (bridge *Bridge) delete(path string, result interface{}) error {
+	return bridge.do("DELETE", bridge.toURI(path), nil, result)
+}
+
+func (bridge *Bridge) do(method string, url string, request interface{}, result interface{}) error {
+	// Marshal request struct to JSON
+	var body io.Reader
+	var requestData []byte
+
+	if request != nil {
+		requestData, err := json.Marshal(request)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(requestData)
 	}
-	request, err := http.NewRequest("PUT", uri, body)
+
+	// Create HTTP request with JSON body
+	httpRequest, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	httpRequest.Header.Set("Content-Type", "application/json")
 
-	return bridge.client.Do(request)
-}
-
-func (bridge *Bridge) delete(path string) (*http.Response, error) {
-	uri := bridge.toURI(path)
+	// Execute request
 	if bridge.debug {
-		log.Printf("DELETE %s\n", uri)
-	}
-	request, err := http.NewRequest("DELETE", uri, nil)
-	if err != nil {
-		return nil, err
+		log.Printf("[%s] Request to %s (Body: %s)\n", method, url, requestData)
 	}
 
-	return bridge.client.Do(request)
+	httpResponse, err := bridge.client.Do(httpRequest)
+	if httpResponse != nil {
+		defer httpResponse.Body.Close()
+		defer io.Copy(ioutil.Discard, httpResponse.Body)
+	}
+	if err != nil {
+		return err
+	}
+
+	// Decode response JSON to struct
+	if result != nil {
+		responseData, err := ioutil.ReadAll(httpResponse.Body)
+		if err != nil {
+			return err
+		}
+
+		if bridge.debug {
+			log.Printf("[%s] Response to %s (Body: %s)\n", method, url, responseData)
+		}
+
+		err = json.Unmarshal(responseData, result)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GetNewLights retrieves the list lights we've seen since
@@ -127,27 +143,13 @@ func (bridge *Bridge) delete(path string) (*http.Response, error) {
 // that may have occurred as per:
 // http://developers.meethue.com/1_lightsapi.html#12_get_new_lights
 func (bridge *Bridge) GetNewLights() ([]*Light, string, error) {
-	response, err := bridge.get("/lights/new")
-	if response != nil {
-		defer response.Body.Close()
-	}
-	if err != nil {
-		return nil, "", err
-	}
-
-	data, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, "", err
-	}
-
 	results := make(map[string]interface{})
-	err = json.Unmarshal(data, &results)
+	err := bridge.get("/lights/new", &results)
 	if err != nil {
 		return nil, "", err
 	}
 
 	lastScan := results["lastscan"].(string)
-
 	var lights []*Light
 	for id, params := range results {
 		if id != "lastscan" {
@@ -196,33 +198,18 @@ func (bridge *Bridge) FindLightByName(name string) (*Light, error) {
 // Search starts a lookup for new devices on your bridge as per
 // http://developers.meethue.com/1_lightsapi.html#13_search_for_new_lights
 func (bridge *Bridge) Search() ([]Result, error) {
-	response, err := bridge.post("/lights", nil)
-	if response != nil {
-		defer response.Body.Close()
-	}
+	var results []Result
+	err := bridge.post("/lights", nil, &results)
 	if err != nil {
 		return nil, err
 	}
-
-	var results []Result
-	err = json.NewDecoder(response.Body).Decode(&results)
 	return results, err
 }
 
 // GetAllLights retrieves all devices the bridge is aware of
 func (bridge *Bridge) GetAllLights() ([]*Light, error) {
-	// fetch all the lights
-	response, err := bridge.get("/lights")
-	if response != nil {
-		defer response.Body.Close()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// deconstruct the json results
 	var result map[string]LightAttributes
-	err = json.NewDecoder(response.Body).Decode(&result)
+	err := bridge.get("/lights", &result)
 	if err != nil {
 		return nil, err
 	}
