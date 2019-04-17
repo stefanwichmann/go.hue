@@ -14,6 +14,8 @@ func newTimeoutClient() *http.Client {
 		DialTLS:               timeoutDialerTLS,
 		TLSHandshakeTimeout:   clientTimeout,
 		ResponseHeaderTimeout: clientTimeout,
+		MaxIdleConns:          10,
+		MaxConnsPerHost:       10,
 	}
 
 	return &http.Client{
@@ -28,7 +30,8 @@ func timeoutDialer(network, addr string) (net.Conn, error) {
 }
 
 func timeoutDialerTLS(network, addr string) (net.Conn, error) {
+	dialer := net.Dialer{Timeout: clientTimeout}
 	// The hue bridge uses a self-signed certificate
 	conf := tls.Config{InsecureSkipVerify: true}
-	return tls.Dial(network, addr, &conf)
+	return tls.DialWithDialer(&dialer, network, addr, &conf)
 }
