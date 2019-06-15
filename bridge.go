@@ -9,15 +9,20 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 )
 
 // Bridge is a representation of the Philips Hue bridge device.
 type Bridge struct {
-	IpAddr   string
-	Username string
-	debug    bool
-	useHTTPS bool
-	client   *http.Client
+	IpAddr               string
+	Username             string
+	debug                bool
+	useHTTPS             bool
+	delayBetweenRequests time.Duration
+	lastRequestTimestamp time.Time
+	lock                 sync.Mutex
+	client               *http.Client
 }
 
 // CreateUser registers a new user on the bridge. The user will have
@@ -32,6 +37,9 @@ func (bridge *Bridge) CreateUser(deviceType string) error {
 		return err
 	}
 
+	bridge.lock.Lock()
+	defer bridge.lock.Unlock()
+
 	value := results[0]
 	bridge.Username = value["success"]["username"]
 	return nil
@@ -40,18 +48,32 @@ func (bridge *Bridge) CreateUser(deviceType string) error {
 // NewBridge instantiates a bridge object. Use this method when you already
 // know the ip address and username to use.
 func NewBridge(ipAddr, username string) *Bridge {
-	return &Bridge{IpAddr: ipAddr, Username: username, debug: false, useHTTPS: false, client: newTimeoutClient()}
+	return &Bridge{IpAddr: ipAddr, Username: username, debug: false, useHTTPS: false, delayBetweenRequests: 0, client: newTimeoutClient()}
 }
 
 // Debug enables the output of debug messages for every bridge request.
 func (bridge *Bridge) Debug() *Bridge {
+	bridge.lock.Lock()
+	defer bridge.lock.Unlock()
+
 	bridge.debug = true
 	return bridge
 }
 
 // EnableHTTPS controls the use of an encrypted communication (requires bridge software version 1.24 or later)
 func (bridge *Bridge) EnableHTTPS(enable bool) {
+	bridge.lock.Lock()
+	defer bridge.lock.Unlock()
+
 	bridge.useHTTPS = enable
+}
+
+// EnableRateLimiting will only allow requests in the rate of the given paramter duration. If requests are issued faster, the function will wait for the specified time and execute the request afterwards.
+func (bridge *Bridge) EnableRateLimiting(delayBetweenRequests time.Duration) {
+	bridge.lock.Lock()
+	defer bridge.lock.Unlock()
+
+	bridge.delayBetweenRequests = delayBetweenRequests
 }
 
 func (bridge *Bridge) baseURL() string {
@@ -85,6 +107,22 @@ func (bridge *Bridge) delete(path string, result interface{}) error {
 }
 
 func (bridge *Bridge) do(method string, url string, request interface{}, result interface{}) error {
+	bridge.lock.Lock()
+	defer bridge.lock.Unlock()
+
+	if bridge.delayBetweenRequests > 0 {
+		// Enforce rate limit
+		now := time.Now()
+		nextRequest := bridge.lastRequestTimestamp.Add(bridge.delayBetweenRequests)
+		if now.Before(nextRequest) {
+			waitTime := time.Until(nextRequest)
+			if bridge.debug {
+				log.Printf("RATE LIMIT: Waiting %s until executing the next request", waitTime)
+			}
+			time.Sleep(waitTime)
+		}
+	}
+
 	// Marshal request struct to JSON
 	var body io.Reader
 	var requestData []byte
@@ -110,6 +148,7 @@ func (bridge *Bridge) do(method string, url string, request interface{}, result 
 	}
 
 	httpResponse, err := bridge.client.Do(httpRequest)
+	bridge.lastRequestTimestamp = time.Now()
 	if httpResponse != nil {
 		defer httpResponse.Body.Close()
 		defer io.Copy(ioutil.Discard, httpResponse.Body)

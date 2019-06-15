@@ -10,6 +10,7 @@ For documentation, check out the link to godoc above.
 - Added scenes API
 - Added additional bridge discovery method (LAN scanning)
 - Added HTTPS support (needs bridge API version 1.24)
+- Added rate limiting
 - Adapt API changes
 - Fixed documentation issues
 - Fixed ```go vet``` and ```go lint``` issues
