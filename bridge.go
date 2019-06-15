@@ -21,7 +21,7 @@ type Bridge struct {
 	useHTTPS             bool
 	delayBetweenRequests time.Duration
 	lastRequestTimestamp time.Time
-	lock                 sync.Mutex
+	lock                 *sync.Mutex
 	client               *http.Client
 }
 
@@ -48,7 +48,7 @@ func (bridge *Bridge) CreateUser(deviceType string) error {
 // NewBridge instantiates a bridge object. Use this method when you already
 // know the ip address and username to use.
 func NewBridge(ipAddr, username string) *Bridge {
-	return &Bridge{IpAddr: ipAddr, Username: username, debug: false, useHTTPS: false, delayBetweenRequests: 0, client: newTimeoutClient()}
+	return &Bridge{IpAddr: ipAddr, Username: username, debug: false, useHTTPS: false, delayBetweenRequests: 0, client: newTimeoutClient(), lock: &sync.Mutex{}}
 }
 
 // Debug enables the output of debug messages for every bridge request.
