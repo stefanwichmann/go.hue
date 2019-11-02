@@ -3,7 +3,7 @@ package hue
 import "encoding/json"
 import "net/http"
 
-const nupnpEndpoint = "https://www.meethue.com/api/nupnp"
+const nupnpEndpoint = "https://discovery.meethue.com/"
 
 type nupnpBridge struct {
 	Serial string `json:"id"`
